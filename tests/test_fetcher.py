@@ -55,7 +55,7 @@ class TestFetcher(unittest.TestCase):
         import tests.data_test_webpage
         import httpbin
 
-        self.httpbin_thread = utils.run_in_subprocess(httpbin.app.run, port=14887)
+        self.httpbin_thread = utils.run_in_subprocess(httpbin.app.run, port=14887, passthrough_errors=False)
         self.httpbin = 'http://127.0.0.1:14887'
 
         self.inqueue = Queue(10)
@@ -90,6 +90,13 @@ class TestFetcher(unittest.TestCase):
             self.phantomjs.wait()
         self.rpc._quit()
         self.thread.join()
+
+        assert not utils.check_port_open(5000)
+        assert not utils.check_port_open(23333)
+        assert not utils.check_port_open(24444)
+        assert not utils.check_port_open(25555)
+        assert not utils.check_port_open(14887)
+
         time.sleep(1)
 
     def test_10_http_get(self):
@@ -191,6 +198,10 @@ class TestFetcher(unittest.TestCase):
         self.assertGreater(end_time - start_time, 1.5)
         self.assertLess(end_time - start_time, 4.5)
 
+        response = rebuild_response(result)
+        self.assertEqual(response.orig_url, request['url'])
+        self.assertEqual(response.save, request['fetch']['save'])
+
     def test_65_418(self):
         request = copy.deepcopy(self.sample_task_http)
         request['url'] = self.httpbin+'/status/418'
@@ -230,6 +241,8 @@ class TestFetcher(unittest.TestCase):
         end_time = time.time()
         self.assertGreater(end_time - start_time, 2)
         self.assertLess(end_time - start_time, 5)
+        self.assertEqual(result['status_code'], 599)
+        self.assertIn('js_script_result', result)
 
     def test_90_phantomjs_js_script(self):
         if not self.phantomjs:
